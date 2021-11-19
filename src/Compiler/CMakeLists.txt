@@ -24,6 +24,13 @@ add_custom_target(ExternalUtil DEPENDS ${FILE_GENERATE_DIR}/ExternalUtil.hpp)
 
 get_property(OMLibs GLOBAL PROPERTY ONNX_MLIR_LIBS)
 
+# Link LLVM libraries necessary to query which target architectures are configured.
+llvm_expand_pseudo_components(TARGET_LIBS AllTargetsDescs AllTargetsCodeGens AllTargetsAsmParsers)
+set(ExtraLLVMLibs)
+foreach(t ${TARGET_LIBS})
+  list(APPEND ExtraLLVMLibs "LLVM${t}")
+endforeach(t)
+
 add_onnx_mlir_library(CompilerUtils
   CompilerUtils.cpp
 
@@ -40,6 +47,7 @@ add_onnx_mlir_library(CompilerUtils
 
   LINK_LIBS PUBLIC
   ${OMLibs}
+  ${ExtraLLVMLibs}  
   MLIRAffineTransforms
   MLIRLinalgTransforms
   MLIRLLVMToLLVMIRTranslation
