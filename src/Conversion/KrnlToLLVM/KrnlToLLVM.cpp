@@ -419,21 +419,20 @@ public:
 
   LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto krnlGlobalOp = llvm::cast<KrnlGlobalOp>(op);
     llvm::errs() << "at line " << __LINE__ << "\n";
-    assert(krnlGlobalOp.value().hasValue() &&
-           "Krnl Global must always have a value");
+    auto *context = op->getContext();
+    auto loc = op->getLoc();
+    llvm::errs() << "at line " << __LINE__ << "\n";
+    auto krnlGlobalOp = llvm::dyn_cast<KrnlGlobalOp>(op);
+    auto alignmentAttr = krnlGlobalOp.alignmentAttr();
     llvm::errs() << "at line " << __LINE__ << "\n";
 
-    MLIRContext *context = op->getContext();
-    Location loc = op->getLoc();
-    IntegerAttr alignmentAttr = krnlGlobalOp.alignmentAttr();
     ModuleOp module = op->getParentOfType<ModuleOp>();
-    StringRef name = krnlGlobalOp.name();
+    auto name = krnlGlobalOp.name();
     llvm::errs() << "at line " << __LINE__ << "\n";
 
     // Compute total number of elements.
-    auto shape = krnlGlobalOp.shape().cast<ArrayAttr>();
+    auto shape = (krnlGlobalOp.shape()).dyn_cast<ArrayAttr>();
     llvm::errs() << "at line " << __LINE__ << "\n";
     int64_t numElements = 1;
     for (unsigned int i = 0; i < shape.size(); ++i)
@@ -443,15 +442,15 @@ public:
 
     // Create the global at the entry of the module.
     LLVM::GlobalOp global;
-    Type type = op->getResult(0).getType();
+    auto type = op->getResult(0).getType();
     auto memRefTy = type.cast<mlir::MemRefType>();
 
     llvm::errs() << "at line " << __LINE__ << "\n";
 
     // The element type of the array.
-    Type constantElementType =
+    auto constantElementType =
         typeConverter->convertType(memRefTy.getElementType());
-    Type globalType = constantElementType;
+    auto globalType = constantElementType;
 
     llvm::errs() << "at line " << __LINE__ << "\n";
 
@@ -466,7 +465,10 @@ public:
     auto llvmGlobalType = globalType.cast<Type>();
     llvm::errs() << "at line " << __LINE__ << "\n";
 
-    size_t sizeInBytes = numElements * getMemRefEltSizeInBytes(memRefTy);
+    if (!krnlGlobalOp.value().hasValue())
+      llvm_unreachable("Krnl Global must always have a value");
+
+    int64_t sizeInBytes = numElements * getMemRefEltSizeInBytes(memRefTy);
     {
       OpBuilder::InsertionGuard insertGuard(rewriter);
       rewriter.setInsertionPointToStart(module.getBody());
@@ -483,7 +485,7 @@ public:
                              .cast<OpaqueElementsAttr>()
                              .getValue();
         // Check data size.
-        assert((data.size() == sizeInBytes) && "Data size mismatch.");
+        assert(((int64_t)data.size() == sizeInBytes) && "Data size mismatch.");
 
         StringAttr llvmStringAttr = StringAttr::get(context, data);
         global = rewriter.create<LLVM::GlobalOp>(loc, llvmArrayI8Ty,
@@ -491,12 +493,13 @@ public:
       } else if (krnlGlobalOp.value().getValue().isa<DenseElementsAttr>()) {
         DenseElementsAttr denseAttr =
             krnlGlobalOp.value().getValue().cast<DenseElementsAttr>();
-        if (!denseAttr.isSplat() && (sizeInBytes > 1024)) {
+        if ((!denseAttr.isSplat()) && (sizeInBytes > 1024)) {
           std::vector<char> rawData = denseAttr.getRawData();
           // Check data size.
-          assert((rawData.size() == sizeInBytes) && "Data size mismatch.");
+          assert(((int64_t)rawData.size() == sizeInBytes) &&
+                 "Data size mismatch.");
 
-          StringRef data = StringRef(rawData.data(), rawData.size());
+          StringRef data = StringRef((char *)rawData.data(), rawData.size());
           StringAttr llvmStringAttr = StringAttr::get(context, data);
           global = rewriter.create<LLVM::GlobalOp>(loc, llvmArrayI8Ty,
               /*isConstant=*/true, LLVM::Linkage::Internal, name,
@@ -1942,29 +1945,39 @@ struct ConvertKrnlToLLVMPass
 void ConvertKrnlToLLVMPass::runOnOperation() {
   // Annotate ModuleOp with endian information so that LLVM global constants are
   // handled correctly by the other LLVM tools such as 'opt'.
+  llvm::errs() << "at line " << __LINE__ << "\n";
+
   bool isLittleEndian = llvm::support::endian::system_endianness() ==
                         llvm::support::endianness::little;
   StringRef endian = isLittleEndian ? "e" : "E";
   ModuleOp module = getOperation();
   module->setAttr("llvm.data_layout", StringAttr::get(&getContext(), endian));
 
+  llvm::errs() << "at line " << __LINE__ << "\n";
+
   // Determine, for each output, whether it is a constant or not.
   SmallVector<bool, 4> constantOutputs;
   checkConstantOutputs(module, constantOutputs);
+
+  llvm::errs() << "at line " << __LINE__ << "\n";
 
   // Define the target for this lowering i.e. the LLVM dialect.
   ConversionTarget target(getContext());
   target.addLegalDialect<LLVM::LLVMDialect>();
   target.addLegalOp<ModuleOp>();
   target.addLegalOp<UnrealizedConversionCastOp>();
+  llvm::errs() << "at line " << __LINE__ << "\n";
 
   // Lower the MemRef types to a representation in LLVM.
   LowerToLLVMOptions options(&getContext());
   options.emitCWrappers = true;
+  llvm::errs() << "at line " << __LINE__ << "\n";
 
   // Convert types to legal types for the LLVM dialect.
   LLVMTypeConverter typeConverter(&getContext(), options);
+  llvm::errs() << "at line " << __LINE__ << "\n";
 
+#if 0
   typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {
     llvm::errs() << "at line " << __LINE__ << "\n";
     Type elementType = type.getElementType();
@@ -1984,21 +1997,29 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
     llvm::errs() << "at line " << __LINE__ << "\n";
     return typeConverter.convertType(type.getLLVMType(type.getContext()));
   });
+#endif
 
   // We have a combination of `krnl`, `affine`, `vector`, and `std` operations.
   // We lower in stages until all the code is in the LLVM dialect.
   RewritePatternSet patterns(&getContext());
 
+  llvm::errs() << "at line " << __LINE__ << "\n";
+
+#if 0
   // Type conversion for function signatures.
   populateFuncOpTypeConversionPattern(patterns, typeConverter);
+  llvm::errs() << "at line " << __LINE__ << "\n";
+#endif
 
   populateAffineAndKrnlToLLVMConversion(
       patterns, &getContext(), typeConverter, constantOutputs);
+  llvm::errs() << "at line " << __LINE__ << "\n";
 
   // We want to completely lower to LLVM, so we use a `FullConversion`. This
   // ensures that only legal operations will remain after the conversion.
   if (failed(
           applyFullConversion(getOperation(), target, std::move(patterns)))) {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     signalPassFailure();
   }
 }
