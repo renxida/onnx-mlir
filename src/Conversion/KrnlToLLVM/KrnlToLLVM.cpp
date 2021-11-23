@@ -65,8 +65,10 @@ static onnx::TensorProto::DataType llvmTypeToOnnxType(mlir::Type elemType) {
     return onnx::TensorProto::INT32;
   if (elemType.isSignedInteger(64))
     return onnx::TensorProto::INT64;
-  if (elemType.isa<StringType>())
+  if (elemType.isa<StringType>()) {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     return onnx::TensorProto::STRING;
+  }
   if (elemType.isa<Float16Type>())
     return onnx::TensorProto::FLOAT16;
   if (elemType.isa<Float64Type>())
@@ -171,9 +173,12 @@ static FlatSymbolRefAttr getOrInsertMemcpy(
 
 static Optional<FlatSymbolRefAttr> getFunctionDeclaration(
     ModuleOp module, const char *funcName) {
+  llvm::errs() << "at line " << __LINE__ << "\n";
   assert(funcName && "Missing function name");
   if (module.lookupSymbol<LLVM::LLVMFuncOp>(funcName))
     return SymbolRefAttr::get(module.getContext(), funcName);
+
+  llvm::errs() << "at line " << __LINE__ << "\n";
   return None;
 }
 
@@ -525,6 +530,8 @@ public:
         rewriter, loc, *getTypeConverter(), memRefTy, localValue);
 
     rewriter.replaceOp(op, {llvmMemRef});
+    llvm::errs() << "at line " << __LINE__ << "\n";
+
     return success();
   }
 
@@ -536,6 +543,7 @@ private:
   // Store the given address into a MemRefDescriptor (a struct).
   MemRefDescriptor createMemRefDescriptor(Value address, MemRefType memRefType,
       Location loc, OpBuilder &builder) const {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     Type elementType = memRefType.getElementType();
     LLVMTypeConverter &typeConverter = *getTypeConverter();
     Type llvmElemType = typeConverter.convertType(elementType);
@@ -553,6 +561,7 @@ private:
   // the address of the global strings into an array. Return the array address.
   Value lowerStringLiteral(
       KrnlGlobalOp &krnlGlobalOp, OpBuilder &builder) const {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     assert(krnlGlobalOp.value().getValue().isa<DenseElementsAttr>() &&
            "Expecting a dense value");
 
@@ -598,6 +607,7 @@ private:
   // Return the GlobalOp for the given string, creating one if not found.
   LLVM::GlobalOp getOrCreateGlobalString(
       StringRef str, Location loc, OpBuilder &builder, ModuleOp module) const {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     LLVM::GlobalOp global = module.lookupSymbol<LLVM::GlobalOp>(str);
     if (!global) {
       // Create the global at the entry of the module.
@@ -616,6 +626,7 @@ private:
   // Return a pointer to the first character in a global string.
   LLVM::GEPOp getPtrToGlobalString(
       const LLVM::GlobalOp &global, Location loc, OpBuilder &builder) const {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     Type i8Type = IntegerType::get(builder.getContext(), 8);
     Type i8PtrType = LLVM::LLVMPointerType::get(i8Type);
     Type llvmIndexType =
@@ -743,6 +754,7 @@ public:
 
   LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     MLIRContext *context = op->getContext();
     KrnlStrlenOpAdaptor operandAdaptor(operands);
     Location loc = op->getLoc();
@@ -774,6 +786,7 @@ private:
   /// module if necessary.
   static FlatSymbolRefAttr getOrInsertStrlen(
       PatternRewriter &rewriter, ModuleOp module) {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     constexpr const char *funcName = "strlen";
     Optional<FlatSymbolRefAttr> optFuncDecl =
         getFunctionDeclaration(module, funcName);
@@ -808,6 +821,7 @@ public:
 
   LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     KrnlStrncmpOpAdaptor operandAdaptor(operands);
     Location loc = op->getLoc();
 
@@ -842,6 +856,7 @@ private:
   /// module if necessary.
   static FlatSymbolRefAttr getOrInsertStrncmp(
       PatternRewriter &rewriter, ModuleOp module) {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     constexpr const char *funcName = "strncmp";
     Optional<FlatSymbolRefAttr> optFuncDecl =
         getFunctionDeclaration(module, funcName);
@@ -1673,6 +1688,7 @@ public:
 
   LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     auto findIndexOp = cast<KrnlFindIndexOp>(op);
     MLIRContext *context = findIndexOp.getContext();
     Location loc = findIndexOp.getLoc();
@@ -1728,6 +1744,7 @@ private:
   /// function, inserting it into the module if necessary.
   static FlatSymbolRefAttr getOrInsertFindIndex(
       PatternRewriter &rewriter, ModuleOp module, Type inputType) {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     MLIRContext *ctx = module.getContext();
     Type i8Type = IntegerType::get(ctx, 8);
     Type i32Type = IntegerType::get(ctx, 32);
@@ -1820,9 +1837,13 @@ void mlir::populateAffineAndKrnlToLLVMConversion(RewritePatternSet &patterns,
   patterns.insert<KrnlUnaryMathOpLowering<KrnlTanOp>>(ctx);
 
   // C library functions.
+  llvm::errs() << "at line " << __LINE__ << "\n";
   patterns.insert<KrnlMemcpyOpLowering>(ctx);
+  llvm::errs() << "at line " << __LINE__ << "\n";
   patterns.insert<KrnlStrlenOpLowering>(ctx);
+  llvm::errs() << "at line " << __LINE__ << "\n";
   patterns.insert<KrnlStrncmpOpLowering>(ctx);
+  llvm::errs() << "at line " << __LINE__ << "\n";
 }
 
 void mlir::checkConstantOutputs(
@@ -1945,16 +1966,22 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
   LLVMTypeConverter typeConverter(&getContext(), options);
 
   typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     Type elementType = type.getElementType();
-    if (!elementType.isa<StringType>())
+    llvm::errs() << "at line " << __LINE__ << "\n";
+    if (!elementType.isa<StringType>()) {
+      llvm::errs() << "at line " << __LINE__ << "\n";
       return llvm::None;
+    }
 
     elementType = elementType.cast<StringType>().getLLVMType(type.getContext());
+    llvm::errs() << "at line " << __LINE__ << "\n";
     return typeConverter.convertType(
         MemRefType::get(type.getShape(), elementType));
   });
 
   typeConverter.addConversion([&](StringType type) -> Type {
+    llvm::errs() << "at line " << __LINE__ << "\n";
     return typeConverter.convertType(type.getLLVMType(type.getContext()));
   });
 
