@@ -515,10 +515,10 @@ public:
     llvm::errs() << "at line " << __LINE__ << "\n";
 
     // Set alignment if alignment != 0.
-    if (alignmentAttr && alignmentAttr.getValue().getSExtValue() != 0) {
+    if (alignmentAttr && alignmentAttr.getValue().getSExtValue() != 0)
       global.alignmentAttr(alignmentAttr);
-    }
 
+#if 0
     // Prepare data to be inserted into MemRef.
     Value globalValue = rewriter.create<LLVM::AddressOfOp>(loc, global);
     auto globalPtrType =
@@ -527,12 +527,17 @@ public:
     Value localValue =
         rewriter.create<LLVM::BitcastOp>(loc, globalPtrType, globalValue);
 
-    llvm::errs() << "at line " << __LINE__ << "\n";
     // Create llvm MemRef from original MemRef and fill the data pointers.
     auto llvmMemRef = MemRefDescriptor::fromStaticShape(
         rewriter, loc, *getTypeConverter(), memRefTy, localValue);
+#endif
 
-    rewriter.replaceOp(op, {llvmMemRef});
+    // Prepare data to be inserted into a MemRefDescriptor (a struct).
+    Value globalOpAddr = rewriter.create<LLVM::AddressOfOp>(loc, global);
+    MemRefDescriptor memRefDescr =
+        createMemRefDescriptor(globalOpAddr, memRefTy, loc, rewriter);
+
+    rewriter.replaceOp(op, {memRefDescr});
     llvm::errs() << "at line " << __LINE__ << "\n";
 
     return success();
@@ -1828,6 +1833,7 @@ void mlir::populateAffineAndKrnlToLLVMConversion(RewritePatternSet &patterns,
   patterns.insert<KrnlInstrumentOpLowering>(ctx);
 
   patterns.insert<KrnlRandomNormalOpLowering>(ctx);
+  patterns.insert<KrnlFindIndexOpLowering>(ctx);
 
   // Math library functions.
   patterns.insert<KrnlUnaryMathOpLowering<KrnlErfOp>>(ctx);
