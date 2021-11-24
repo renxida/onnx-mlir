@@ -1977,7 +1977,7 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
   LLVMTypeConverter typeConverter(&getContext(), options);
   llvm::errs() << "at line " << __LINE__ << "\n";
 
-#if 0
+#if 1
   typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {
     llvm::errs() << "at line " << __LINE__ << "\n";
     Type elementType = type.getElementType();
@@ -1992,7 +1992,9 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
     return typeConverter.convertType(
         MemRefType::get(type.getShape(), elementType));
   });
+#endif
 
+#if 1
   typeConverter.addConversion([&](StringType type) -> Type {
     llvm::errs() << "at line " << __LINE__ << "\n";
     return typeConverter.convertType(type.getLLVMType(type.getContext()));
