@@ -38,7 +38,7 @@ llvm::cl::OptionCategory OnnxMlirOptions(
 
 namespace {
 
-static llvm::Optional<std::string> getEnvVar(std::string name) {
+llvm::Optional<std::string> getEnvVar(std::string name) {
   if (const char *envVerbose = std::getenv(name.c_str()))
     return std::string(envVerbose);
   return llvm::None;
@@ -49,39 +49,38 @@ static llvm::Optional<std::string> getEnvVar(std::string name) {
 // TODO: Find a respectable home for the wain
 
 // the option is used in this file, so defined here
-static llvm::cl::opt<bool> invokeOnnxVersionConverter(
-    "invokeOnnxVersionConverter",
+llvm::cl::opt<bool> invokeOnnxVersionConverter("invokeOnnxVersionConverter",
     llvm::cl::desc(
         "call onnx vesion converter to convert ONNX model to current version"),
     llvm::cl::init(false), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<bool> preserveLocations("preserveLocations",
+llvm::cl::opt<bool> preserveLocations("preserveLocations",
     llvm::cl::desc("emit location data:"), llvm::cl::init(false),
     llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<bool> printIR("printIR",
+llvm::cl::opt<bool> printIR("printIR",
     llvm::cl::desc("print the IR to stdout:"), llvm::cl::init(false),
     llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<bool> preserveBitcode("preserveBitcode",
+llvm::cl::opt<bool> preserveBitcode("preserveBitcode",
     llvm::cl::desc(
         "dont delete the bitcode files (optimized and unoptimized):"),
     llvm::cl::init(false), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<bool> preserveMLIR("preserveMLIR",
+llvm::cl::opt<bool> preserveMLIR("preserveMLIR",
     llvm::cl::desc("dont delete the MLIR files (input and llvm):"),
     llvm::cl::init(false), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<bool> useOnnxModelTypes("useOnnxModelTypes",
+llvm::cl::opt<bool> useOnnxModelTypes("useOnnxModelTypes",
     llvm::cl::desc("use types and shapes from ONNX model"),
     llvm::cl::init(false), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<int> repeatOnnxTransform("repeatOnnxTransform",
+llvm::cl::opt<int> repeatOnnxTransform("repeatOnnxTransform",
     llvm::cl::desc(
         "invoke extra onnx transform pass(shape infernce, constant and etc.)"),
     llvm::cl::init(0), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<string> shapeInformation("shapeInformation",
+llvm::cl::opt<string> shapeInformation("shapeInformation",
     llvm::cl::desc(
         "Custom shapes for the inputs of the ONNX model, e.g. setting static "
         "shapes for dynamic inputs.\n"
@@ -93,27 +92,14 @@ static llvm::cl::opt<string> shapeInformation("shapeInformation",
         "unknown dimensions)"),
     llvm::cl::value_desc("value"), llvm::cl::cat(OnnxMlirOptions));
 
-static llvm::cl::opt<std::string> mtriple("mtriple",
+llvm::cl::opt<std::string> mtriple("mtriple",
     llvm::cl::desc("Target architecture"),
     llvm::cl::value_desc("LLVM target triple>"), llvm::cl::cat(OnnxMlirOptions),
     llvm::cl::ValueRequired);
 
-static llvm::cl::opt<std::string> mcpu("mcpu", llvm::cl::desc("Target cpu"),
+llvm::cl::opt<std::string> mcpu("mcpu", llvm::cl::desc("Target cpu"),
     llvm::cl::value_desc("Target a specific CPU type"),
     llvm::cl::cat(OnnxMlirOptions), llvm::cl::ValueRequired);
-
-enum OptLevel { O0, O1, O2, O3 };
-static llvm::cl::opt<OptLevel> OptimizationLevel(
-    llvm::cl::desc("Optimization levels:"),
-    llvm::cl::values(clEnumVal(O0, "Optimization level 0 (default)."),
-        clEnumVal(O1, "Optimization level 1."),
-        clEnumVal(O2, "Optimization level 2."),
-        clEnumVal(O3, "Optimization level 3.")),
-    llvm::cl::init(O0), llvm::cl::cat(OnnxMlirOptions));
-
-static llvm::cl::opt<bool> VerboseOutput("v",
-    llvm::cl::desc("Use verbose output"), llvm::cl::init(false),
-    llvm::cl::cat(OnnxMlirOptions));
 
 // Make a function that forces preserving all files using the runtime arguments
 // and/or the overridePreserveFiles enum.
@@ -143,7 +129,7 @@ static bool keepFiles(KeepFilesOfType preserve) {
   return false;
 }
 
-static std::string getExecPath() {
+string getExecPath() {
   // argv0 is only used as a fallback for rare environments
   // where /proc isn't mounted and mainExecAddr is only needed for
   // unknown unix-like platforms
@@ -168,7 +154,7 @@ static std::string getExecPath() {
 //     correctly resolve to /usr/local/lib), but some systems still have
 //     lib64 so we check that first. If neither exists, then
 //   - use CMAKE_INSTALL_PREFIX/lib, which is typically /usr/local/lib
-static std::string getRuntimeDir() {
+string getRuntimeDir() {
   const auto &envDir = getEnvVar("ONNX_MLIR_RUNTIME_DIR");
   if (envDir && llvm::sys::fs::exists(envDir.getValue()))
     return envDir.getValue();
@@ -210,7 +196,7 @@ static std::string getRuntimeDir() {
 // installed system wide but to different places and their sources have been
 // removed. So we force CMAKE_INSTALL_PREFIX to be the same as that of
 // llvm-project.
-static std::string getToolPath(string tool) {
+string getToolPath(string tool) {
   string execDir = llvm::sys::path::parent_path(getExecPath()).str();
   llvm::SmallString<8> toolPath(execDir);
   llvm::sys::path::append(toolPath, tool);
@@ -259,14 +245,14 @@ struct Command {
   }
 
   // Execute command.
-  void exec() const {
+  void exec() {
     auto argsRef = std::vector<llvm::StringRef>(_args.begin(), _args.end());
     bool verbose = false;
     if (const auto &verboseStr = getEnvVar("ONNX_MLIR_VERBOSE"))
       istringstream(verboseStr.getValue()) >> verbose;
 
     // If in verbose mode, print out command before execution.
-    if (VerboseOutput || verbose)
+    if (verbose)
       cout << _path << ": " << llvm::join(argsRef, " ") << "\n";
 
     std::string errMsg;
@@ -317,9 +303,9 @@ static std::string getTargetCpuOption() {
   return targetOptions;
 }
 
-static std::string getTargetTripleOption() {
+string getTargetTripleOption() {
   string targetOptions = "";
-  // Command cannot tolerate extra spaces. Add only when needed.
+  // Comand cannot tolerate extra spaces. Add only when needed.
   if (mtriple != "")
     targetOptions = "--mtriple=" + mtriple;
   else if (kDefaultTriple != "")
@@ -327,23 +313,8 @@ static std::string getTargetTripleOption() {
   return targetOptions;
 }
 
-static std::string getOptimizationLevelOption() {
-  switch (OptimizationLevel) {
-  case OptLevel::O0:
-    return "-O0";
-  case OptLevel::O1:
-    return "-O1";
-  case OptLevel::O2:
-    return "-O2";
-  case OptLevel::O3:
-    return "-O3";
-  }
-  llvm_unreachable("Unexpected optimization level");
-  return "";
-}
-
 // Write LLVM optimized bitcode.
-static void genLLVMBitcode(const mlir::OwningModuleRef &module,
+void genLLVMBitcode(const mlir::OwningModuleRef &module,
     string optimizedBitcodePath, string outputBaseName) {
   error_code error;
 
@@ -368,7 +339,7 @@ static void genLLVMBitcode(const mlir::OwningModuleRef &module,
   // Use the LLVM's 'opt' command to optimize the bitcode.
   string optPath = getToolPath("opt");
   Command optBitcode(/*exePath=*/!optPath.empty() ? optPath : kOptPath);
-  optBitcode.appendStr(getOptimizationLevelOption())
+  optBitcode.appendStr("-O3")
       .appendStr(getTargetTripleOption())
       .appendStr(getTargetCpuOption())
       .appendList({"-o", optimizedBitcodePath})
@@ -377,7 +348,7 @@ static void genLLVMBitcode(const mlir::OwningModuleRef &module,
 }
 
 // Compile LLVM bitcode to object file.
-static std::string genModelObject(string bitcodePath, string outputBaseName) {
+string genModelObject(string bitcodePath, string outputBaseName) {
 
 #ifdef _WIN32
   string modelObjPath = outputBaseName + ".obj";
@@ -387,8 +358,7 @@ static std::string genModelObject(string bitcodePath, string outputBaseName) {
 
   string llcPath = getToolPath("llc");
   Command llvmToObj(/*exePath=*/!llcPath.empty() ? llcPath : kLlcPath);
-  llvmToObj.appendStr(getOptimizationLevelOption())
-      .appendStr("-filetype=obj")
+  llvmToObj.appendStr("-filetype=obj")
       .appendStr("-relocation-model=pic")
       .appendList({"-o", modelObjPath})
       .appendStr(bitcodePath)
@@ -396,8 +366,8 @@ static std::string genModelObject(string bitcodePath, string outputBaseName) {
   return modelObjPath;
 }
 
-static void genJniObject(const mlir::OwningModuleRef &module,
-    string jniSharedLibPath, string jniObjPath) {
+void genJniObject(const mlir::OwningModuleRef &module, string jniSharedLibPath,
+    string jniObjPath) {
   Command ar(/*exePath=*/kArPath);
   ar.appendStr("x")
       .appendStr("--output")
@@ -408,7 +378,7 @@ static void genJniObject(const mlir::OwningModuleRef &module,
 }
 
 // Link everything into a shared object.
-static std::string genSharedLib(string outputBaseName, std::vector<string> opts,
+string genSharedLib(string outputBaseName, std::vector<string> opts,
     std::vector<string> objs, std::vector<string> libs,
     std::vector<string> libDirs) {
 
@@ -445,8 +415,8 @@ static std::string genSharedLib(string outputBaseName, std::vector<string> opts,
 
 // Create jar containing java runtime and model shared library (which includes
 // jni runtime).
-static void genJniJar(const mlir::OwningModuleRef &module,
-    string modelSharedLibPath, string modelJniJarPath) {
+void genJniJar(const mlir::OwningModuleRef &module, string modelSharedLibPath,
+    string modelJniJarPath) {
   llvm::SmallString<8> runtimeDir(getRuntimeDir());
   llvm::sys::path::append(runtimeDir, "javaruntime.jar");
   string javaRuntimeJarPath = llvm::StringRef(runtimeDir).str();
@@ -464,7 +434,7 @@ static void genJniJar(const mlir::OwningModuleRef &module,
       .exec();
 }
 
-std::string compileModuleToSharedLibrary(
+string compileModuleToSharedLibrary(
     const mlir::OwningModuleRef &module, std::string outputBaseName) {
 
   string bitcodePath = outputBaseName + ".bc";
