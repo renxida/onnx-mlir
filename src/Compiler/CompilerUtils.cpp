@@ -96,6 +96,10 @@ llvm::cl::opt<string> mcpu("mcpu", llvm::cl::desc("Target cpu"),
     llvm::cl::value_desc("<llvm cpu value>"), llvm::cl::cat(OnnxMlirOptions),
     llvm::cl::ValueRequired);
 
+static llvm::cl::opt<bool> VerboseOutput("v",
+    llvm::cl::desc("Use verbose output"), llvm::cl::init(false),
+    llvm::cl::cat(OnnxMlirOptions));
+
 // Make a function that forces preserving all files using the runtime arguments
 // and/or the overridePreserveFiles enum.
 enum class KeepFilesOfType { All, MLIR, Bitcode, Object, None };
@@ -247,7 +251,7 @@ struct Command {
       istringstream(verboseStr.getValue()) >> verbose;
 
     // If in verbose mode, print out command before execution.
-    if (verbose)
+    if (VerboseOutput || verbose)
       cout << _path << ": " << llvm::join(argsRef, " ") << "\n";
 
     std::string errMsg;
@@ -648,9 +652,6 @@ void outputCode(
 
   module->print(output->os(), flags);
   output->keep();
-
-  if (printIR)
-    module->print(llvm::outs(), flags);
 }
 
 void emitOutputFiles(string outputBaseName, EmissionTargetType emissionTarget,
@@ -743,6 +744,13 @@ int compileModule(mlir::OwningModuleRef &module, mlir::MLIRContext &context,
   if (mlir::failed(pm.run(*module)))
     return 4;
 
-  emitOutputFiles(outputBaseName, emissionTarget, context, module);
+  if (printIR) {
+    mlir::OpPrintingFlags flags;
+    if (preserveLocations)
+      flags.enableDebugInfo();
+    module->print(llvm::outs(), flags);
+  } else
+    emitOutputFiles(outputBaseName, emissionTarget, context, module);
+
   return 0;
 }
