@@ -518,20 +518,6 @@ public:
     if (alignmentAttr && alignmentAttr.getValue().getSExtValue() != 0)
       global.alignmentAttr(alignmentAttr);
 
-#if 0
-    // Prepare data to be inserted into MemRef.
-    Value globalValue = rewriter.create<LLVM::AddressOfOp>(loc, global);
-    auto globalPtrType =
-        LLVM::LLVMPointerType::get(constantElementType.cast<Type>());
-    // Bitcast the global to the MemRefType's element type.
-    Value localValue =
-        rewriter.create<LLVM::BitcastOp>(loc, globalPtrType, globalValue);
-
-    // Create llvm MemRef from original MemRef and fill the data pointers.
-    auto llvmMemRef = MemRefDescriptor::fromStaticShape(
-        rewriter, loc, *getTypeConverter(), memRefTy, localValue);
-#endif
-
     // Prepare data to be inserted into a MemRefDescriptor (a struct).
     Value globalOpAddr = rewriter.create<LLVM::AddressOfOp>(loc, global);
     MemRefDescriptor memRefDescr =
@@ -1983,7 +1969,6 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
   LLVMTypeConverter typeConverter(&getContext(), options);
   llvm::errs() << "at line " << __LINE__ << "\n";
 
-#if 1
   typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {
     llvm::errs() << "at line " << __LINE__ << "\n";
     Type elementType = type.getElementType();
@@ -1998,14 +1983,11 @@ void ConvertKrnlToLLVMPass::runOnOperation() {
     return typeConverter.convertType(
         MemRefType::get(type.getShape(), elementType));
   });
-#endif
 
-#if 1
   typeConverter.addConversion([&](StringType type) -> Type {
     llvm::errs() << "at line " << __LINE__ << "\n";
     return typeConverter.convertType(type.getLLVMType(type.getContext()));
   });
-#endif
 
   // We have a combination of `krnl`, `affine`, `vector`, and `std` operations.
   // We lower in stages until all the code is in the LLVM dialect.
